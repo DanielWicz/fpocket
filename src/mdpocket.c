@@ -69,6 +69,14 @@ static int register_cb(void *v, vmdplugin_t *p) {
 
  */
 void mdpocket_detect(s_mdparams *par) {
+    if (par == NULL) {
+        fprintf(stderr, "Error: Null parameter structure passed to mdpocket_detect.\n");
+        return;
+    }
+    if (par->traj_format == NULL) {
+        fprintf(stderr, "Error: MD trajectory format not specified in parameters.\n");
+        return;
+    }
     int i = 0, j, k;
 
     int n_snapshots = 0;
@@ -126,12 +134,42 @@ void mdpocket_detect(s_mdparams *par) {
     if (par) {
         /* Opening output files */
         //fout[0] = fopen(par->f_pqr,"w") ;   /*concat pqr output*/
-        fout1 = fopen(par->f_freqdx, "w"); /*grid dx output*/
-        fout2 = fopen(par->f_densdx, "w"); /*grid dx output*/
-        fout3 = fopen(par->f_freqiso, "w"); /*iso pdb output*/
-        fout4 = fopen(par->f_densiso, "w"); /*iso pdb output*/
-        fout5 = fopen(par->f_appdb, "w"); /*all atom -> pocket density output on bfactors*/
-        timef = fopen("time.txt", "w"); /*performance measurement output*/
+        fout1 = fopen(par->f_freqdx, "w");
+        if (!fout1) {
+            fprintf(stderr, "Error: Could not open output file %s for writing.\n", par->f_freqdx);
+            return;
+        }
+        fout2 = fopen(par->f_densdx, "w");
+        if (!fout2) {
+            fprintf(stderr, "Error: Could not open output file %s for writing.\n", par->f_densdx);
+            fclose(fout1);
+            return;
+        }
+        fout3 = fopen(par->f_freqiso, "w");
+        if (!fout3) {
+            fprintf(stderr, "Error: Could not open output file %s for writing.\n", par->f_freqiso);
+            fclose(fout1); fclose(fout2);
+            return;
+        }
+        fout4 = fopen(par->f_densiso, "w");
+        if (!fout4) {
+            fprintf(stderr, "Error: Could not open output file %s for writing.\n", par->f_densiso);
+            fclose(fout1); fclose(fout2); fclose(fout3);
+            return;
+        }
+        fout5 = fopen(par->f_appdb, "w");
+        if (!fout5) {
+            fprintf(stderr, "Error: Could not open output file %s for writing.\n", par->f_appdb);
+            fclose(fout1); fclose(fout2); fclose(fout3); fclose(fout4);
+            return;
+        }
+        timef = fopen("time.txt", "w");
+        if (!timef) {
+            fprintf(stderr, "Error: Could not open performance file time.txt for writing.\n");
+            fclose(fout1); fclose(fout2); fclose(fout3); fclose(fout4); fclose(fout5);
+            return;
+        }
+
         if (fout1 && fout2 && fout3 && fout4 && fout5) {
           
             //mdconcat=init_md_concat();  /*alloc & init of the mdconcat structure*/
@@ -144,6 +182,10 @@ void mdpocket_detect(s_mdparams *par) {
                     fprintf(stdout, "<mdpocket>s %d/%d - %s:",
                             i + 1, par->nfiles, par->fsnapshot[i]);
                     cpdb = open_pdb_file(par->fsnapshot[i],par); /*open the snapshot*/
+                    if (cpdb == NULL) {
+                        fprintf(stderr, "Error: Unable to open snapshot file %s.\n", par->fsnapshot[i]);
+                        continue;  /* Skip this snapshot and move to the next */
+                    }
                     //printf("\navant %d\n",get_number_of_objects_in_memory());
 
                     pockets = mdprocess_pdb(cpdb, par, i + 1); /*perform pocket detection*/
@@ -222,7 +264,12 @@ void mdpocket_detect(s_mdparams *par) {
                 ts_in.coords = (float *) malloc(3 * inatoms * sizeof (float));
 
                 //                print_number_of_objects_in_memory();
-
+                if (ts_in.coords == NULL) {
+                    fprintf(stderr, "Error: Memory allocation failure for trajectory coordinates.\n");
+                    api->close_file_read(h_in);
+                    free_pdb_atoms(topology_pdb);
+                    return;
+                }
                 rc = api->read_next_timestep(h_in, inatoms, &ts_in);
                 //print_number_of_objects_in_memory();                                
                 if (rc == -1) {
@@ -371,6 +418,10 @@ void mdpocket_characterize(s_mdparams *par) {
     s_pdb *topology_pdb = NULL;
     s_fparams *params = par->fpar;
     FILE *null = fopen("/dev/null", "w"); /*open a /dev/null redir for the pqr concat output*/
+    if (!null) {
+        fprintf(stderr, "Error: Unable to open /dev/null for writing.\n");
+        return;
+    }
     FILE *descfile = NULL; /*file handle for the descriptor file*/
     FILE * fout[2];
     FILE *elec_file = NULL;
@@ -382,7 +433,16 @@ void mdpocket_characterize(s_mdparams *par) {
     c_lst_pockets *pockets = NULL; /*handle for the pockets found in one snapshots*/
     //  c_lst_pockets *mdpockets=c_lst_pockets_alloc();     /*handle for one pocket per snapshot in a chained list*/
     s_pdb *wantedpocket = rpdb_open(par->fwantedpocket, NULL, M_DONT_KEEP_LIG, 0,params); /*open in the reference pocket (grid points)*/
-    rpdb_read(wantedpocket, NULL, M_DONT_KEEP_LIG, 0,params); /*read this pocket*/
+    if (wantedpocket == NULL) {
+         fprintf(stderr, "Error: Unable to open the wanted pocket file %s.\n", par->fwantedpocket);
+         fclose(null);
+         return;
+    }
+    if (rpdb_read(wantedpocket, NULL, M_DONT_KEEP_LIG, 0, params) != SUCCESS) {
+         fprintf(stderr, "Error: Failed to read the wanted pocket file %s.\n", par->fwantedpocket);
+         fclose(null);
+         return;
+    } /*read this pocket*/
 
     s_pdb *cpdb = NULL; /*pdb handle for the current snapshot structure*/
 
@@ -416,8 +476,26 @@ void mdpocket_characterize(s_mdparams *par) {
 
     if (par) {
         descfile = fopen(par->f_desc, "w"); /*open the descriptor output file*/
+        if (!descfile) {
+            fprintf(stderr, "Error: Could not open descriptor file %s for writing.\n", par->f_desc);
+            fclose(null);
+            return;
+        }
         fout[0] = fopen(par->f_ppdb, "w");
+        if (!fout[0]) {
+            fprintf(stderr, "Error: Could not open output file %s for writing.\n", par->f_ppdb);
+            fclose(null);
+            fclose(descfile);
+            return;
+        }
         fout[1] = fopen(par->f_apdb, "w");
+        if (!fout[1]) {
+            fprintf(stderr, "Error: Could not open output file %s for writing.\n", par->f_apdb);
+            fclose(null);
+            fclose(descfile);
+            fclose(fout[0]);
+            return;
+        }
 
         /*print all the headers in this file*/
         fprintf(descfile, M_MDP_OUTP_HEADER);
@@ -579,7 +657,15 @@ void mdpocket_characterize(s_mdparams *par) {
                             sprintf(vdwgrid_path, "vdw_energy_grid_%04d.dx", k);
                             sprintf(elecgrid_path, "elec_energy_grid_%04d.dx", k);
                             f_out_vdwgrid = fopen(vdwgrid_path, "w");
+                            if (!f_out_vdwgrid) {
+                                fprintf(stderr, "Error: Could not open grid file %s for writing.\n", vdwgrid_path);
+                                /* Optionally skip grid writing for this snapshot */
+                            }
                             f_out_elecgrid = fopen(elecgrid_path, "w");
+                            if (!f_out_elecgrid) {
+                                fprintf(stderr, "Error: Could not open grid file %s for writing.\n", elecgrid_path);
+                                /* Optionally skip grid writing for this snapshot */
+                            }
                         }
                         if (k == 1) {
                             pocket_vdw_grid = init_pocket_grid(cpocket);
