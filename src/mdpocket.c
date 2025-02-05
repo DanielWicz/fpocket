@@ -284,7 +284,16 @@ void mdpocket_detect(s_mdparams *par) {
 
             if (par->nfiles) {
                 cpdb = open_pdb_file(par->fsnapshot[0],par); /*open again the first snapshot*/
-            } else cpdb = open_pdb_file(par->fpar->pdb_path,par); /*open again the first snapshot*/
+            } else { cpdb = open_pdb_file(par->fpar->pdb_path,par); /*open again the first snapshot*/
+	    }
+
+            if (cpdb == NULL) {
+                fprintf(stderr, "Error: Unable to open the pdb file for snapshot.\n");
+                fclose(fout1); fclose(fout2); fclose(fout3); fclose(fout4); fclose(fout5);
+                fclose(timef);
+                return;
+            }
+
             rpdb_read(cpdb, NULL, M_DONT_KEEP_LIG, 0,par->fpar);
             project_grid_on_atoms(densgrid, cpdb);
             write_first_bfactor_density(fout5, cpdb);
@@ -426,6 +435,10 @@ void mdpocket_characterize(s_mdparams *par) {
                 fflush(stdout);
                 fprintf(fout[0], "MODEL        %d\n", i);
                 cpdb = open_pdb_file(par->fsnapshot[i],par); /*open the snapshot pdb handle*/
+                if (cpdb == NULL) {
+                    fprintf(stderr, "Error: Unable to open pdb file: %s\n", par->fsnapshot[i]);
+                    continue;  // Skip this snapshot
+                }
                 pockets = mdprocess_pdb(cpdb, par, i + 1); /*perform pocket detection on the current snapshot*/
 
                 if (i == 0)wanted_atom_ids = get_wanted_atom_ids(cpdb, wantedpocket, &nwanted_atom_ids);
@@ -693,8 +706,17 @@ void write_md_descriptors(FILE *f, s_pocket *p, int i) {
 
  */
 s_pocket* extract_wanted_vertices(c_lst_pockets *pockets, s_pdb *pdb) {
+    if (pockets == NULL || pdb == NULL) {
+        fprintf(stderr, "Error: Null pointer passed to extract_wanted_vertices.\n");
+        return NULL;
+    }
     s_pocket *p = alloc_pocket(); /*alloc memory for a new pocket*/
+    if (p == NULL) return NULL;
     p->v_lst = c_lst_vertices_alloc(); /*alloc memory for vertices in new pocket*/
+    if (p->v_lst == NULL) {
+        free(p);
+        return NULL;
+    }
     s_pocket *cp = NULL; /*just a handler for the chained list navigation*/
     node_pocket *cur = NULL; /*again just a handler for navigation*/
     cur = pockets->first; /*get the first pocket in the chained list*/
@@ -702,9 +724,6 @@ s_pocket* extract_wanted_vertices(c_lst_pockets *pockets, s_pdb *pdb) {
     size_t i;
     int z;
     s_atm *cura = NULL;
-
-
-
 
     while (cur) { /*loop over all snapshot pockets*/
         cp = cur->pocket;
@@ -756,6 +775,11 @@ s_pocket* extract_wanted_vertices(c_lst_pockets *pockets, s_pdb *pdb) {
 
  */
 int *get_wanted_atom_ids(s_pdb *prot, s_pdb *pocket, int *n) {
+    if (prot == NULL || pocket == NULL) {
+        fprintf(stderr, "Error: Null pointer passed to get_wanted_atom_ids.\n");
+        *n = 0;
+        return NULL;
+    }
     int *ids = (int *) my_malloc(sizeof (int));
     int v, a;
     *n = 1;
@@ -771,15 +795,21 @@ int *get_wanted_atom_ids(s_pdb *prot, s_pdb *pocket, int *n) {
             if (dist(cura->x, cura->y, cura->z, curv->x, curv->y, curv->z) <= M_MDP_WP_ATOM_DIST) {
                 ids[*n - 1] = cura->id;
                 *n = *n + 1;
-                ids = (int *) my_realloc(ids, sizeof (int) *(*n));
-                ids[*n - 1]=-1;
+                int *temp = (int *) my_realloc(ids, sizeof (int) * (*n));
+                if (temp == NULL) {
+                    fprintf(stderr, "Error: Reallocation failed in get_wanted_atom_ids.\n");
+                    free(ids);
+                    *n = 0;
+                    return NULL;
+                }
+                ids = temp;
+                ids[*n - 1] = -1;
                 flag = 1;
             }
             v++;
         }
     }
     return (ids);
-
 }
 
 /**
