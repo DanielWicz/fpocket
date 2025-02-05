@@ -438,11 +438,7 @@ void mdpocket_characterize(s_mdparams *par) {
          fclose(null);
          return;
     }
-    if (rpdb_read(wantedpocket, NULL, M_DONT_KEEP_LIG, 0, params) != SUCCESS) {
-         fprintf(stderr, "Error: Failed to read the wanted pocket file %s.\n", par->fwantedpocket);
-         fclose(null);
-         return;
-    } /*read this pocket*/
+    rpdb_read(wantedpocket, NULL, M_DONT_KEEP_LIG, 0, params); /*read this pocket*/
 
     s_pdb *cpdb = NULL; /*pdb handle for the current snapshot structure*/
 
