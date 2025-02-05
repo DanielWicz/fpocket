@@ -130,12 +130,11 @@ s_mdparams* get_mdpocket_args(int nargs, char **args) {
     int traj_file_defined = 0, traj_format_defined = 0, traj_topology_defined = 0, traj_topology_format_defined = 0;
 
     char *str_list_file = NULL;
-    char **args_copy = my_malloc(sizeof (char**) *nargs);
+    char **args_copy = my_malloc(sizeof (char*) * nargs);
     for (i = 0; i < nargs; i++) {
-        args_copy[i] = my_malloc(sizeof (args[i]));
+        args_copy[i] = my_malloc(strlen(args[i]) + 1);
         strcpy(args_copy[i], args[i]);
     }
-
 
     s_mdparams *par = init_def_mdparams();
     //    for (i = 0; i < nargs; i++) printf(" %s ", args[i]);
@@ -310,7 +309,7 @@ int add_list_snapshots(char *str_list_file, s_mdparams *par)
 
 	if(f) {
         //first read the amount of files to read
-		while(fgets(buf, 210, f)) {
+                while(fgets(buf, sizeof(buf), f)) {
 			n = par->nfiles ;
 			status = sscanf(buf, "%s", snapbuf) ;
             if(status < 1) {
@@ -337,12 +336,13 @@ int add_list_snapshots(char *str_list_file, s_mdparams *par)
                     nread += add_snapshot(snapbuf, par) ;
                 }
             }
+
         }
+        fclose(f);
 	}
 	else {
 		fprintf(stderr, "! File %s doesn't exists\n", str_list_file) ;
 	}
-        fclose(f);
         return nread ;
 }
 
