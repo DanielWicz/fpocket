@@ -180,7 +180,8 @@ s_mdparams* get_mdpocket_args(int nargs, char **args) {
 //                printf("option -t with value `%s'\n", optarg);
                 status++;
                 par->flag_MD = 1;
-                strcpy(par->f_traj, optarg);
+                strncpy(par->f_traj, optarg, M_MAX_FILE_NAME_LENGTH - 1);
+                par->f_traj[M_MAX_FILE_NAME_LENGTH - 1] = '\0';
                 traj_file_defined++;
                 break;
             case M_MDPAR_TRAJECTORY_FORMAT:
@@ -214,20 +215,18 @@ s_mdparams* get_mdpocket_args(int nargs, char **args) {
 				status++;
 
                 break;
-
             case M_MDPAR_OUTPUT_FILE:
-                sprintf(par->f_pqr, "%s.pqr", optarg);
-                sprintf(par->f_freqdx, "%s_freq.dx", optarg);
-                sprintf(par->f_densdx, "%s_dens.dx", optarg);
-                sprintf(par->f_freqiso, "%s_freq_iso_0_5.pdb", optarg);
-                sprintf(par->f_densiso, "%s_dens_iso_8.pdb", optarg);
-                sprintf(par->f_desc, "%s_descriptors.txt", optarg);
-                sprintf(par->f_ppdb, "%s_mdpocket.pdb", optarg);
-                sprintf(par->f_apdb, "%s_mdpocket_atoms.pdb", optarg);
-                sprintf(par->f_appdb, "%s_all_atom_pdensities.pdb", optarg);
-                sprintf(par->f_elec, "%s_elec_grid.dx", optarg);
-                sprintf(par->f_vdw, "%s_vdw_grid.dx", optarg);
-
+                snprintf(par->f_pqr, M_MAX_FILE_NAME_LENGTH, "%s.pqr", optarg);
+                snprintf(par->f_freqdx, M_MAX_FILE_NAME_LENGTH, "%s_freq.dx", optarg);
+                snprintf(par->f_densdx, M_MAX_FILE_NAME_LENGTH, "%s_dens.dx", optarg);
+                snprintf(par->f_freqiso, M_MAX_FILE_NAME_LENGTH, "%s_freq_iso_0_5.pdb", optarg);
+                snprintf(par->f_densiso, M_MAX_FILE_NAME_LENGTH, "%s_dens_iso_8.pdb", optarg);
+                snprintf(par->f_desc, M_MAX_FILE_NAME_LENGTH, "%s_descriptors.txt", optarg);
+                snprintf(par->f_ppdb, M_MAX_FILE_NAME_LENGTH, "%s_mdpocket.pdb", optarg);
+                snprintf(par->f_apdb, M_MAX_FILE_NAME_LENGTH, "%s_mdpocket_atoms.pdb", optarg);
+                snprintf(par->f_appdb, M_MAX_FILE_NAME_LENGTH, "%s_all_atom_pdensities.pdb", optarg);
+                snprintf(par->f_elec, M_MAX_FILE_NAME_LENGTH, "%s_elec_grid.dx", optarg);
+                snprintf(par->f_vdw, M_MAX_FILE_NAME_LENGTH, "%s_vdw_grid.dx", optarg);
                 break;
 
             case M_MDPAR_INPUT_FILE2:
@@ -308,41 +307,37 @@ int add_list_snapshots(char *str_list_file, s_mdparams *par)
 	f = fopen(str_list_file, "r") ;
 
 	if(f) {
-        //first read the amount of files to read
-                while(fgets(buf, sizeof(buf), f)) {
-			n = par->nfiles ;
-			status = sscanf(buf, "%s", snapbuf) ;
+        // first read the amount of files to read
+		while(fgets(buf, sizeof(buf), f)) {
+			status = sscanf(buf, "%s", snapbuf);
             if(status < 1) {
-				fprintf(stderr, "! Skipping row '%s' with bad format (status %d).\n",
-								buf, status) ;
-			}
-			else {
-				nfiles ++;
+				fprintf(stderr, "! Skipping row '%s' with bad format (status %d).\n", buf, status);
+			} else {
+				nfiles++;
 			}
 		}
-        fprintf(stdout,"Identified %d snapshots to analyze\n",nfiles);
+        fprintf(stdout,"Identified %d snapshots to analyze\n", nfiles);
         fflush(stdout);
 
-        if(nfiles>0){
-            par->fsnapshot = (char**) my_malloc( (nfiles) * sizeof (char*));
+        if(nfiles > 0){
+            par->fsnapshot = (char**) my_malloc(nfiles * sizeof(char*));
             fseek(f, 0, SEEK_SET);
-            while(fgets(buf, 210, f)) {
-                status = sscanf(buf, "%s", snapbuf) ;
+            while(fgets(buf, sizeof(buf), f)) {
+                status = sscanf(buf, "%s", snapbuf);
                 if(status < 1) {
-                    fprintf(stderr, "! Skipping row '%s' with bad format (status %d).\n",
-                                    buf, status) ;
-                }
-                else {
-                    nread += add_snapshot(snapbuf, par) ;
+                    fprintf(stderr, "! Skipping row '%s' with bad format (status %d).\n", buf, status);
+                } else {
+                    nread += add_snapshot(snapbuf, par);
                 }
             }
-
         }
         fclose(f);
 	}
 	else {
-		fprintf(stderr, "! File %s doesn't exists\n", str_list_file) ;
+		fprintf(stderr, "! File %s doesn't exists\n", str_list_file);
 	}
+
+
         return nread ;
 }
 
@@ -493,8 +488,12 @@ void print_mdpocket_usage(FILE *f) {
  */
 void free_mdparams(s_mdparams *p) {
     if (p) {
-
+        int i;
         if (p->fsnapshot) {
+            for(i = 0; i < p->nfiles; i++) {
+                if(p->fsnapshot[i])
+                    my_free(p->fsnapshot[i]);
+            }
             my_free(p->fsnapshot);
             p->fsnapshot = NULL;
         }
@@ -502,27 +501,64 @@ void free_mdparams(s_mdparams *p) {
             my_free(p->f_pqr);
             p->f_pqr = NULL;
         }
+        if (p->f_freqdx) {
+            my_free(p->f_freqdx);
+            p->f_freqdx = NULL;
+        }
         if (p->f_densdx) {
             my_free(p->f_densdx);
             p->f_densdx = NULL;
         }
-        if (p->f_freqdx) {
-            my_free(p->f_freqdx);
-            p->f_freqdx = NULL;
+        if (p->f_freqiso) {
+            my_free(p->f_freqiso);
+            p->f_freqiso = NULL;
+        }
+        if (p->f_densiso) {
+            my_free(p->f_densiso);
+            p->f_densiso = NULL;
         }
         if (p->f_desc) {
             my_free(p->f_desc);
             p->f_desc = NULL;
         }
-        if (p->traj_format) {
-            my_free(p->traj_format);
-            p->traj_format = NULL;
+        if (p->f_ppdb) {
+            my_free(p->f_ppdb);
+            p->f_ppdb = NULL;
+        }
+        if (p->f_apdb) {
+            my_free(p->f_apdb);
+            p->f_apdb = NULL;
+        }
+        if (p->f_appdb) {
+            my_free(p->f_appdb);
+            p->f_appdb = NULL;
         }
         if (p->f_traj) {
             my_free(p->f_traj);
             p->f_traj = NULL;
         }
+        if (p->f_topo) {
+            my_free(p->f_topo);
+            p->f_topo = NULL;
+        }
+        if (p->traj_format) {
+            my_free(p->traj_format);
+            p->traj_format = NULL;
+        }
+        if (p->topo_format) {
+            my_free(p->topo_format);
+            p->topo_format = NULL;
+        }
+        if (p->f_elec) {
+            my_free(p->f_elec);
+            p->f_elec = NULL;
+        }
+        if (p->f_vdw) {
+            my_free(p->f_vdw);
+            p->f_vdw = NULL;
+        }
         free_fparams(p->fpar);
         my_free(p);
     }
 }
+
