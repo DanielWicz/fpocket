@@ -283,57 +283,71 @@ s_fparams *get_fpocket_args(int nargs, char **args)
 
             break;
 
-    case M_PAR_CUSTOM_POCKET:
+        case M_PAR_CUSTOM_POCKET:
+            // parse pocket specification that has to be given as
+            // residuenumber1:insertion_code1:chain_code1.residuenumber2:insertion_code2:chain_code2
+            // for example: "127::A.128::A"
 
-        // parse pocket specification that has to be given as
-        // residuenumber1:insertion_code1:chain_code1.residuenumber2:insertion_code2:chain_code2
-        // for 1uyd for instance "127::A.128::A"
-
-        status++;
-
-        strcpy(par->custom_pocket_arg, optarg);
-        char *rest = par->custom_pocket_arg;
-        char *rest2;
-        /* Use a temporary character buffer instead of an array of pointers */
-        char residue_string[M_MAX_CUSTOM_POCKET_LEN];
-        /* count residues first */
-        while ((pt = strtok_r(rest, ".", &rest)))
-            par->xpocket_n++;
-
-        par->xpocket_chain_code = (char *)my_malloc(par->xpocket_n * sizeof(char));
-        par->xpocket_insertion_code = (char *)my_malloc(par->xpocket_n * sizeof(char));
-        par->xpocket_residue_number = (unsigned short *)my_malloc(par->xpocket_n * sizeof(unsigned short));
-        pti = 0;
-        strcpy(par->custom_pocket_arg, optarg);
-        rest = par->custom_pocket_arg;
-        while ((pt = strtok_r(rest, ".", &rest)))
-        {
-            /* Copy the token into the buffer correctly */
-            strcpy(residue_string, pt);
-            rest2 = residue_string;
-            apti = 0;
-            while ((apt = strtok_r(rest2, ":", &rest2)))
-            {
-                switch (apti)
-                {
-                case 0:
-                    par->xpocket_residue_number[pti] = (unsigned short)atoi(apt);
-                    break;
-                case 1:
-                    /* Copy one character and ensure proper termination if needed */
-                    strncpy(&(par->xpocket_insertion_code[pti]), apt, 1);
-                    break;
-                case 2:
-                    strncpy(&(par->xpocket_chain_code[pti]), apt, 1);
-                    break;
-                default:
-                    break;
-                }
-                apti++;
+            status++;
+            if (!optarg) {
+                fprintf(stderr, "ERROR: Missing argument for custom pocket.\n");
+                break;
             }
-            pti++;
-        }
-        break;
+            // Copy the original argument into custom_pocket_arg buffer
+            strcpy(par->custom_pocket_arg, optarg);
+            {
+                char *saveptr1, *saveptr2;
+                char residue_string[M_MAX_CUSTOM_POCKET_LEN];
+                char *token;
+
+                // Count residues using strtok_r safely
+                par->xpocket_n = 0;
+                token = strtok_r(par->custom_pocket_arg, ".", &saveptr1);
+                while (token != NULL) {
+                    par->xpocket_n++;
+                    token = strtok_r(NULL, ".", &saveptr1);
+                }
+
+                // Allocate memory for xpocket arrays (each will hold one character per residue)
+                par->xpocket_chain_code = (char *)my_malloc(par->xpocket_n * sizeof(char));
+                par->xpocket_insertion_code = (char *)my_malloc(par->xpocket_n * sizeof(char));
+                par->xpocket_residue_number = (unsigned short *)my_malloc(par->xpocket_n * sizeof(unsigned short));
+
+                // Reset custom_pocket_arg to original optarg for second tokenization
+                strcpy(par->custom_pocket_arg, optarg);
+                pti = 0;
+                token = strtok_r(par->custom_pocket_arg, ".", &saveptr1);
+                while (token != NULL) {
+                    // Copy token into temporary buffer with bounds check
+                    strncpy(residue_string, token, M_MAX_CUSTOM_POCKET_LEN - 1);
+                    residue_string[M_MAX_CUSTOM_POCKET_LEN - 1] = '\0';
+
+                    apti = 0;
+                    char *apt = strtok_r(residue_string, ":", &saveptr2);
+                    while (apt != NULL) {
+                        switch (apti) {
+                        case 0:
+                            par->xpocket_residue_number[pti] = (unsigned short)atoi(apt);
+                            break;
+                        case 1:
+                            // Ensure only one character is copied and null-terminated
+                            par->xpocket_insertion_code[pti] = apt[0];
+                            break;
+                        case 2:
+                            par->xpocket_chain_code[pti] = apt[0];
+                            break;
+                        default:
+                            break;
+                        }
+                        apt = strtok_r(NULL, ":", &saveptr2);
+                        apti++;
+                    }
+                    pti++;
+                    token = strtok_r(NULL, ".", &saveptr1);
+                }
+            }
+            break;
+
 
         case M_PAR_MIN_N_EXPLICIT_POCKET:
             status++;
@@ -590,20 +604,21 @@ s_fparams *DEPR_get_fpocket_args(int nargs, char **args)
             char *line;
             while (fgets(cline, M_MAX_PDB_NAME_LEN, f) != NULL)
             {
-                if (strcmp("\n", cline) != 0)
-                {
-                    l = strlen(cline);
-                    if (cline[l - 1] == '\n')
-                    {
-                        l--;
-                        cline[l] = '\0';
-                    }
-                    line = (char *)my_malloc((l + 1) * sizeof(char));
-                    memcpy(line, cline, l + 1);
+                l = strlen(cline);
+                // Skip empty lines or lines that consist only of a newline
+                if (l == 0 || (l == 1 && cline[0] == '\n'))
+                    continue;
 
-                    par->pdb_lst[i] = line;
-                    i++;
+                if (cline[l - 1] == '\n')
+                {
+                    l--;
+                    cline[l] = '\0';
                 }
+                line = (char *)my_malloc((l + 1) * sizeof(char));
+                memcpy(line, cline, l + 1);
+
+                par->pdb_lst[i] = line;
+                i++;
             }
 
             par->npdb = n;
