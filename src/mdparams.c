@@ -14,7 +14,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ## GENERAL INFORMATION
 ##
 ## FILE 					mdparams.c
-## AUTHORS					P. Schmidtke and V. Le Guilloux
+## AUTHORS					P. Schmidtke and V. Le Guilloux, Wiczew
 ## LAST MODIFIED			25-11-2012
 ##
 ## SPECIFICATIONS
@@ -23,7 +23,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ##	for the mdpocket programm.
 ##
 ## MODIFICATIONS HISTORY
-##
+##      05-02-24        (p)  Added more error handling
 ##	28-11-08	(v)  Comments UTD + relooking
 ##	27-11-08	(v)  Minor Relooking
 ##	01-04-08	(v)  Added comments and creation of history

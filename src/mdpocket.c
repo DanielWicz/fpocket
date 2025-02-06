@@ -13,8 +13,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ## GENERAL INFORMATION
 ##
 ## FILE 					mdpocket.c
-## AUTHORS					P. Schmidtke and V. Le Guilloux
-## LAST MODIFIED                                01-12-2012
+## AUTHORS					P. Schmidtke and V. Le Guilloux, Wiczew
+## LAST MODIFIED                                06-02-2024
 ##
 ## SPECIFICATIONS
 ##
@@ -34,7 +34,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ##      to the manual shipped with fpocket.
 ##
 ## MODIFICATIONS HISTORY
-##
+##      06-02-24        (p) Added error handling
 ##      01-12-12        (p) included molfile plugin support for reading trajectories
 ##	01-08-09	(p) Created (random date...)
 ##
