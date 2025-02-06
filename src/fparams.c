@@ -14,7 +14,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ## GENERAL INFORMATION
 ##
 ## FILE 					fparams.c
-## AUTHORS					P. Schmidtke and V. Le Guilloux
+## AUTHORS					P. Schmidtke and V. Le Guilloux, D. Wiczew
 ## LAST MODIFIED			28-02-14
 ##
 ## SPECIFICATIONS
@@ -23,6 +23,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ##	for the fpocket programm.
 ##
 ## MODIFICATIONS HISTORY
+##   06-02-24           (p)  adding error handling
 ##   26-03-17           (p)  introducing explicit pocket detection
 ##   04-04-16           (p)  Introduced NMR model numbers
 ##   28-08-14           (p)  Introduced novel argument handling + exposure
@@ -164,11 +165,22 @@ s_fparams *get_fpocket_args(int nargs, char **args)
         case 0:
             break;
 
-        case M_PAR_WRITE_MODE: /*write mode : d -> default | b -> both pdb and mmcif | p ->pdb | m  -> mmcif*/
+
+        case M_PAR_WRITE_MODE: /*write mode : d -> default | b -> both pdb and mmcif | p -> pdb | m -> mmcif*/
             status++;
-            if (optarg[0] != 'd' && optarg[0] != 'b' && optarg[0] != 'p' && optarg[0] != 'm' && strcmp(optarg, "both") && strcmp(optarg, "pdb") && strcmp(optarg, "cif") && strcmp(optarg, "mmcif"))
-            { /*if args is not a correct arg break*/
-                printf("Writing mode invalid, set to default\n");
+            if (!optarg) {
+                fprintf(stderr, "ERROR: Missing argument for write mode.\n");
+                /* Optionally set a default value */
+                strcpy(par->write_par, "d");
+                strcpy(write_mode, par->write_par);
+                break;
+            }
+            if (optarg[0] != 'd' && optarg[0] != 'b' && optarg[0] != 'p' && optarg[0] != 'm' &&
+                strcmp(optarg, "both") && strcmp(optarg, "pdb") && strcmp(optarg, "cif") && strcmp(optarg, "mmcif"))
+            {
+                fprintf(stderr, "ERROR: Writing mode '%s' invalid, set to default.\n", optarg);
+                strcpy(par->write_par, "d");
+                strcpy(write_mode, par->write_par);
                 break;
             }
             if (!strcmp(optarg, "cif"))
@@ -181,8 +193,8 @@ s_fparams *get_fpocket_args(int nargs, char **args)
                 strcpy(par->write_par, optarg);
                 strcpy(write_mode, par->write_par);
             }
-
             break;
+
 
         case M_PAR_CHAIN_AS_LIGAND: /*option with -a "name of the chain" to be specified as a ligand*/
             /*select the chains as ligand*/
@@ -270,48 +282,58 @@ s_fparams *get_fpocket_args(int nargs, char **args)
             }
 
             break;
-        case M_PAR_CUSTOM_POCKET:
 
-            // parse pocket specification that has to be given as
-            // residuenumber1:insertion_code1:chain_code1.residuenumber2:insertion_code2:chain_code2& ....
-            // for 1uyd for instance 127::A.128::A
+    case M_PAR_CUSTOM_POCKET:
 
-            status++;
+        // parse pocket specification that has to be given as
+        // residuenumber1:insertion_code1:chain_code1.residuenumber2:insertion_code2:chain_code2
+        // for 1uyd for instance "127::A.128::A"
 
-            strcpy(par->custom_pocket_arg, optarg);
-            char *rest = par->custom_pocket_arg;
-            char *rest2;
-            /*count residues first*/
-            while ((pt = strtok_r(rest, ".", &rest)))
-                par->xpocket_n++;
+        status++;
 
-            par->xpocket_chain_code = (char *)my_malloc(par->xpocket_n * sizeof(char));
-            par->xpocket_insertion_code = (char *)my_malloc(par->xpocket_n * sizeof(char));
-            par->xpocket_residue_number = (unsigned short *)my_malloc(par->xpocket_n * sizeof(unsigned short));
-            pti = 0;
-            strcpy(par->custom_pocket_arg, optarg);
-            rest = par->custom_pocket_arg;
-            while ((pt = strtok_r(rest, ".", &rest)))
+        strcpy(par->custom_pocket_arg, optarg);
+        char *rest = par->custom_pocket_arg;
+        char *rest2;
+        /* Use a temporary character buffer instead of an array of pointers */
+        char residue_string[M_MAX_CUSTOM_POCKET_LEN];
+        /* count residues first */
+        while ((pt = strtok_r(rest, ".", &rest)))
+            par->xpocket_n++;
+
+        par->xpocket_chain_code = (char *)my_malloc(par->xpocket_n * sizeof(char));
+        par->xpocket_insertion_code = (char *)my_malloc(par->xpocket_n * sizeof(char));
+        par->xpocket_residue_number = (unsigned short *)my_malloc(par->xpocket_n * sizeof(unsigned short));
+        pti = 0;
+        strcpy(par->custom_pocket_arg, optarg);
+        rest = par->custom_pocket_arg;
+        while ((pt = strtok_r(rest, ".", &rest)))
+        {
+            /* Copy the token into the buffer correctly */
+            strcpy(residue_string, pt);
+            rest2 = residue_string;
+            apti = 0;
+            while ((apt = strtok_r(rest2, ":", &rest2)))
             {
-                strcpy(&residue_string, pt);
-                rest2 = residue_string;
-                apti = 0;
-                while ((apt = strtok_r(rest2, ":", &rest2)))
+                switch (apti)
                 {
-                    switch (apti)
-                    {
-                    case 0:
-                        par->xpocket_residue_number[pti] = (unsigned short)atoi(apt); // fprintf(stdout,"residuenumber: %d\n", atoi(apt));
-                    case 1:
-                        strncpy(&(par->xpocket_insertion_code[pti]), apt, 1);
-                    case 2:
-                        strncpy(&(par->xpocket_chain_code[pti]), apt, 1);
-                    }
-                    apti++;
+                case 0:
+                    par->xpocket_residue_number[pti] = (unsigned short)atoi(apt);
+                    break;
+                case 1:
+                    /* Copy one character and ensure proper termination if needed */
+                    strncpy(&(par->xpocket_insertion_code[pti]), apt, 1);
+                    break;
+                case 2:
+                    strncpy(&(par->xpocket_chain_code[pti]), apt, 1);
+                    break;
+                default:
+                    break;
                 }
-                pti++;
+                apti++;
             }
-            break;
+            pti++;
+        }
+        break;
 
         case M_PAR_MIN_N_EXPLICIT_POCKET:
             status++;
@@ -394,6 +416,22 @@ s_fparams *get_fpocket_args(int nargs, char **args)
             break;
         }
     }
+
+
+    /* --- New File Format Check --- */
+    if (par->pdb_path[0] == '\0')
+    {
+         fprintf(stderr, "ERROR: No input file provided. Please specify a PDB or CIF file.\n");
+         return NULL;
+    }
+    if (!strstr(par->pdb_path, ".pdb") && !strstr(par->pdb_path, ".cif"))
+    {
+         fprintf(stderr, "ERROR: The file '%s' does not appear to be in a valid format (.pdb or .cif).\n", par->pdb_path);
+         return NULL;
+    }
+    /* --- End File Format Check --- */
+
+
     if (strstr(par->pdb_path, ".cif") && par->write_par[0] == 'd')
     {
         strcpy(par->write_par, "m");
