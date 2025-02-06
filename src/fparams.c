@@ -195,58 +195,62 @@ s_fparams *get_fpocket_args(int nargs, char **args)
             }
             break;
 
-
         case M_PAR_CHAIN_AS_LIGAND: /*option with -a "name of the chain" to be specified as a ligand*/
-            /*select the chains as ligand*/
             status++;
+            if (!optarg) {
+                fprintf(stderr, "ERROR: Missing argument for chain as ligand.\n");
+                break;
+            }
             pt = strtok(optarg, separators);
             int nn = 0;
             while (pt != NULL)
             {
                 par->chain_as_ligand[nn] = (char *)malloc((M_MAX_CHAIN_NAME_LENGTH + 1) * sizeof(char));
                 strncpy(par->chain_as_ligand[nn], pt, M_MAX_CHAIN_NAME_LENGTH);
-                par->chain_as_ligand[nn][M_MAX_CHAIN_NAME_LENGTH]='\0';
+                par->chain_as_ligand[nn][M_MAX_CHAIN_NAME_LENGTH] = '\0';
                 nn++;
                 pt = strtok(NULL, separators);
             }
-            par->n_chains_as_ligand=nn;
+            par->n_chains_as_ligand = nn;
             par->xlig_resnumber = 0;
             break;
 
-        case M_PAR_DROP_CHAINS:                /*option with -c "name of the chains"*/
-                                               /*drop the selected chains from the pdb file*/
+        case M_PAR_DROP_CHAINS: /*option with -c "name of the chains"*/
+            if (!optarg) {
+                fprintf(stderr, "ERROR: Missing argument for drop chains.\n");
+                break;
+            }
             pt = strtok(optarg, separators);
             int n = 0;
             while (pt != NULL)
             {
                 par->chain_delete[n] = (char *)malloc((M_MAX_CHAIN_NAME_LENGTH + 1) * sizeof(char));
                 strncpy(par->chain_delete[n], pt, M_MAX_CHAIN_NAME_LENGTH);
-                par->chain_delete[n][M_MAX_CHAIN_NAME_LENGTH]='\0';
-
+                par->chain_delete[n][M_MAX_CHAIN_NAME_LENGTH] = '\0';
                 n++;
                 pt = strtok(NULL, separators);
             }
             par->chain_is_kept = 0;
-            par->n_chains_to_delete=n;
+            par->n_chains_to_delete = n;
             status++;
             break;
 
         case M_PAR_KEEP_CHAINS: /*option with -k "name of the chains"*/
-                                /*drop the selected chains from the pdb file*/
-
+            if (!optarg) {
+                fprintf(stderr, "ERROR: Missing argument for keep chains.\n");
+                break;
+            }
             pt = strtok(optarg, separators);
             int nk = 0;
             while (pt != NULL)
             {
-                
                 par->chain_delete[nk] = (char *)malloc((M_MAX_CHAIN_NAME_LENGTH + 1) * sizeof(char));
                 strncpy(par->chain_delete[nk], pt, M_MAX_CHAIN_NAME_LENGTH);
-                par->chain_delete[nk][M_MAX_CHAIN_NAME_LENGTH]='\0';
+                par->chain_delete[nk][M_MAX_CHAIN_NAME_LENGTH] = '\0';
                 nk++;
                 pt = strtok(NULL, separators);
             }
-            par->n_chains_to_delete=nk;
-            // printf("%s\n",par->chain_delete);
+            par->n_chains_to_delete = nk;
             par->chain_is_kept = 1;
             status++;
             break;
@@ -257,31 +261,38 @@ s_fparams *get_fpocket_args(int nargs, char **args)
             // residuenumber:residuename:chain_code
             // for 1uyd for instance 1224:PU8:A
 
-            status++;
 
+
+            status++;
             // strcpy(par->custom_ligand, optarg);
             // printf("%s and %s",par->custom_ligand,optarg);
-            pt = strtok(optarg, ":");
 
+            if (!optarg) {
+                fprintf(stderr, "ERROR: Missing argument for custom ligand.\n");
+                break;
+            }
+            pt = strtok(optarg, ":");
             while (pt != NULL)
             {
                 custom_ligand_i++;
                 if (custom_ligand_i == 1)
                     par->xlig_resnumber = atoi(pt);
-                else if (custom_ligand_i == 2){
-                    par->xlig_resname= (char *)malloc((M_MAX_LIG_RESNAME_LENGTH + 1) * sizeof(char));
+                else if (custom_ligand_i == 2) {
+                    par->xlig_resname = (char *)malloc((M_MAX_LIG_RESNAME_LENGTH + 1) * sizeof(char));
                     strncpy(par->xlig_resname, pt, M_MAX_LIG_RESNAME_LENGTH);
-                    par->xlig_resname[M_MAX_LIG_RESNAME_LENGTH]='\0';
+                    par->xlig_resname[M_MAX_LIG_RESNAME_LENGTH] = '\0';
                 }
-                else if (custom_ligand_i == 3){
-                    par->xlig_chain_code= (char *)malloc((M_MAX_CHAIN_NAME_LENGTH + 1) * sizeof(char));
+                else if (custom_ligand_i == 3) {
+                    par->xlig_chain_code = (char *)malloc((M_MAX_CHAIN_NAME_LENGTH + 1) * sizeof(char));
                     strncpy(par->xlig_chain_code, pt, M_MAX_CHAIN_NAME_LENGTH);
-                    par->xlig_chain_code[M_MAX_CHAIN_NAME_LENGTH]='\0';
+                    par->xlig_chain_code[M_MAX_CHAIN_NAME_LENGTH] = '\0';
                 }
                 pt = strtok(NULL, ":");
             }
-
             break;
+
+
+
 
         case M_PAR_CUSTOM_POCKET:
             // parse pocket specification that has to be given as
@@ -347,12 +358,17 @@ s_fparams *get_fpocket_args(int nargs, char **args)
                 }
             }
             break;
-
-
+	    
         case M_PAR_MIN_N_EXPLICIT_POCKET:
             status++;
+            if (!optarg) {
+                fprintf(stderr, "ERROR: Missing argument for minimum number of explicit pocket atoms.\n");
+                break;
+            }
             par->min_n_explicit_pocket_atoms = (int)atoi(optarg);
             break;
+
+
 
         case M_PAR_PDB_FILE:
             //                printf("option -f with value `%s'\n", optarg);
